@@ -18,7 +18,46 @@ Usage (once implemented):
     print(result["error"])   # None on success
 """
 
+import re
+
 from tools import search_listings, suggest_outfit, create_fit_card
+
+
+# ── query parsing ─────────────────────────────────────────────────────────────
+
+_PRICE_RE = re.compile(
+    r"(?:under|below|less than|<=?|max(?:imum)?)\s*\$?\s*(\d+(?:\.\d+)?)",
+    re.IGNORECASE,
+)
+_SIZE_RE = re.compile(
+    r"\bsize\s+([a-z0-9/+\-]+)\b"
+    r"|\b(xxs|xs|small|medium|large|xl|xxl|s/m|m/l)\b"
+    r"|\b([smlx]{1,3})\b(?=[\s,.!?]|$)"
+    r"|\b(w\d{2}(?:\s*l\d{2})?)\b",
+    re.IGNORECASE,
+)
+
+
+def _parse_query(query: str) -> dict:
+    """Extract description / size / max_price from a natural-language request."""
+    max_price = None
+    price_match = _PRICE_RE.search(query)
+    if price_match:
+        max_price = float(price_match.group(1))
+
+    size = None
+    size_match = _SIZE_RE.search(query)
+    if size_match:
+        size = next(g for g in size_match.groups() if g)
+
+    description = query
+    if price_match:
+        description = description.replace(price_match.group(0), " ")
+    if size_match:
+        description = description.replace(size_match.group(0), " ")
+    description = re.sub(r"\s+", " ", description).strip(" ,.;:!?")
+
+    return {"description": description, "size": size, "max_price": max_price}
 
 
 # ── session state ─────────────────────────────────────────────────────────────
@@ -92,9 +131,30 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     Before writing code, complete the Planning Loop and State Management sections
     of planning.md — your implementation should match what you described there.
     """
-    # TODO: implement the planning loop
     session = _new_session(query, wardrobe)
-    session["error"] = "Planning loop not yet implemented."
+
+    session["parsed"] = _parse_query(query)
+
+    session["search_results"] = search_listings(**session["parsed"])
+    if not session["search_results"]:
+        session["error"] = (
+            "No listings matched — try a different description, size, or price range."
+        )
+        return session
+
+    session["selected_item"] = session["search_results"][0]
+
+    session["outfit_suggestion"] = suggest_outfit(
+        session["selected_item"], session["wardrobe"]
+    )
+    if not session["outfit_suggestion"] or not session["outfit_suggestion"].strip():
+        session["error"] = "Could not generate an outfit suggestion. Please try again."
+        return session
+
+    session["fit_card"] = create_fit_card(
+        session["outfit_suggestion"], session["selected_item"]
+    )
+
     return session
 
 
