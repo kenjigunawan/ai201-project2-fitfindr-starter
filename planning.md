@@ -137,16 +137,26 @@ For each tool, describe the specific failure mode you're handling and what the a
 
 Write out what a full user interaction looks like from start to finish — tool call by tool call. Use a specific example query.
 
+**What FitFindr needs to do (in 2–3 sentences):**
+FitFindr takes a natural-language thrifting request, parses out the description / size / price ceiling, and triggers `search_listings` to find matching secondhand items; the top result then triggers `suggest_outfit` against the user's wardrobe (or general styling advice if the wardrobe is empty), which in turn triggers `create_fit_card` to write a shareable caption. If `search_listings` returns nothing, the agent stops, surfaces a helpful "no matches — try different filters" message, and never calls `suggest_outfit` or `create_fit_card` with empty input; if `suggest_outfit` returns nothing, the agent stops before `create_fit_card`; if `create_fit_card` gets empty input, it returns a descriptive error string instead of crashing.
+
 **Example user query:** "I'm looking for a vintage graphic tee under $30. I mostly wear baggy jeans and chunky sneakers. What's out there and how would I style it?"
 
 **Step 1:**
 <!-- What does the agent do first? Which tool is called? With what input? -->
+The agent parses the user's query; what they look for (which category), their budget, and their size.
 
 **Step 2:**
 <!-- What happens next? What was returned from step 1? What tool is called now? -->
+Step 1 returns a listing that matches the query.
+
+If the return is nonempty; then Fitfindr looks into the user's wardrobe, with the new_item; and suggests a new outfit with the wardrobe and the new_item.
+
+If the return is empty; this means the user's input doesn't match what is required. The agent can prompt for the empty descriptions/parsing, or reparse the input. If the input was parsed correctly; then the agent can suggest a different outfit combination, or a change in one of the attributes (like price, size, or category/description).
 
 **Step 3:**
 <!-- Continue until the full interaction is complete -->
+Lastly, create fit card;
 
 **Final output to user:**
 <!-- What does the user actually see at the end? -->
